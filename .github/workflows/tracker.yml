@@ -1,0 +1,32 @@
+name: 24/7 Croma Stock Tracker
+
+on:
+  schedule:
+    # Runs automatically every 5 minutes, 24/7 (minimum interval allowed by GitHub)
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Lets you trigger a test run manually with 1 click
+
+jobs:
+  check-stock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright and Requests
+        run: |
+          pip install playwright requests
+          playwright install chromium --with-deps
+
+      - name: Run Croma Stock Checker
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python croma_tracker.py
