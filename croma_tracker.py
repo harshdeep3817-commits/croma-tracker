@@ -9,6 +9,11 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 PINCODE = "125051"
 PRODUCT_URL = "https://www.croma.com/apple-iphone-17-256gb-sage-/p/317403"
 
+# --- SETTINGS ---
+# Set to True if you want a Telegram message every time it checks and is Out of Stock.
+# Set to False so it ONLY messages you when it comes IN STOCK (recommended to avoid spam).
+SEND_OUT_OF_STOCK_ALERT = True 
+
 def send_telegram_alert(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -73,11 +78,19 @@ if __name__ == "__main__":
 
     if in_stock:
         alert_msg = (
-            f"🚨 <b>HURRY! iPhone 17 is IN STOCK on Croma!</b>\n\n"
+            f"🚨 <b>HURRY! iPhone 17 (Sage) is IN STOCK on Croma!</b>\n\n"
             f"📍 Pincode: {PINCODE}\n"
             f"🛒 <a href='{PRODUCT_URL}'>TAP HERE TO BUY NOW</a>"
         )
         send_telegram_alert(alert_msg)
         print("IN STOCK! Telegram alert sent.")
     else:
-        print("Item is currently out of stock. Check complete.")
+        print("Item is currently out of stock.")
+        if SEND_OUT_OF_STOCK_ALERT:
+            status_msg = (
+                f"ℹ️ <b>Croma Status Check</b>\n\n"
+                f"iPhone 17 (Sage) is currently <b>Out of Stock</b> for pincode {PINCODE}.\n"
+                f"<i>Tracker is active and running smoothly.</i>"
+            )
+            send_telegram_alert(status_msg)
+            print("Out of stock status message sent to Telegram.")
