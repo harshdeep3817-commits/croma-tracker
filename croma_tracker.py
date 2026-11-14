@@ -1,4 +1,3 @@
-
 import os
 import sys
 import time
@@ -12,6 +11,10 @@ PINCODE = "125051"
 
 PRODUCT_VARIANTS = [
     {
+        "name": "OnePlus Nord CE6 Lite 5G",
+        "url": "https://www.croma.com/oneplus-nord-ce6-lite-5g-8gb-ram-128gb-hyper-black-/p/322994"
+    },
+    {
         "name": "iPhone 17 (Black)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-black-/p/317396"
     },
@@ -22,18 +25,6 @@ PRODUCT_VARIANTS = [
     {
         "name": "iPhone 17 (Mist Blue)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-mist-blue-/p/324462"
-    },
-    {
-        "name": "iPhone 17 (Lavender)",
-        "url": "https://www.croma.com/apple-iphone-17-256gb-lavender-/p/324465"
-    },
-    {
-        "name": "iPhone 17 (White)",
-        "url": "https://www.croma.com/apple-iphone-17-256gb-white-/p/324461"
-    },
-    {
-        "name": "OnePlus Nord CE6 Lite 5G",
-        "url": "https://www.croma.com/oneplus-nord-ce6-lite-5g-8gb-ram-128gb-hyper-black-/p/322994"
     }
 ]
 
@@ -56,7 +47,7 @@ def run_continuous_monitor():
     start_time = time.time()
     check_count = 0
 
-    send_telegram_alert(f"🚀 <b>Fixed Tracker Started!</b> Monitoring all products for pincode {PINCODE}.")
+    send_telegram_alert(f"🚀 <b>Pincode-Verified Tracker Started!</b> Monitoring products for pincode {PINCODE}.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -79,38 +70,43 @@ def run_continuous_monitor():
 
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                    page.wait_for_timeout(2500)
+                    page.wait_for_timeout(3000)
 
-                    # Enter pincode and apply if visible
+                    # 1. Handle Croma Pincode Entry
                     pincode_input = page.locator("input[placeholder*='Pincode'], input[placeholder*='pincode'], #pincode")
                     if pincode_input.count() > 0 and pincode_input.first.is_visible():
                         pincode_input.first.fill(PINCODE)
                         page.keyboard.press("Enter")
-                        page.wait_for_timeout(2500)
+                        page.wait_for_timeout(2000)
                         
+                        # Click Apply button if present
                         apply_btn = page.locator("button:has-text('Apply'), span:has-text('Apply')")
                         if apply_btn.count() > 0:
                             try:
                                 apply_btn.first.click(timeout=2000)
-                                page.wait_for_timeout(2000)
                             except Exception:
                                 pass
+                        
+                        # CRITICAL: Wait for Croma's inventory AJAX response to update the UI
+                        page.wait_for_timeout(5000)
 
-                    # Look specifically at the main purchase action buttons
-                    purchase_btn = page.locator("button:has-text('Buy Now'), button:has-text('Add to Cart'), button:has-text('Add To Cart')")
-                    
-                    btn_text = ""
-                    if purchase_btn.count() > 0:
-                        btn_text = purchase_btn.first.inner_text().lower()
+                    # 2. Check for Buy / Add to Cart buttons
+                    buttons = page.locator("button, a.btn")
+                    is_available = False
+                    detected_text = ""
 
-                    # Determine availability strictly from the action button state
-                    is_available = (
-                        purchase_btn.count() > 0
-                        and purchase_btn.first.is_enabled()
-                        and "notify" not in btn_text
-                        and "out of stock" not in btn_text
-                        and "unavailable" not in btn_text
-                    )
+                    for i in range(buttons.count()):
+                        try:
+                            btn = buttons.nth(i)
+                            if btn.is_visible():
+                                txt = btn.inner_text().strip().lower()
+                                if "buy now" in txt or "add to cart" in txt:
+                                    if "out of stock" not in txt and "notify" not in txt:
+                                        is_available = True
+                                        detected_text = txt
+                                        break
+                        except Exception:
+                            continue
 
                     # Extract price dynamically
                     price = "Check website"
@@ -130,11 +126,11 @@ def run_continuous_monitor():
                             f"🛒 <a href='{url}'>TAP HERE TO BUY NOW</a>"
                         )
                         send_telegram_alert(alert_msg)
-                        status_report += f"✅ {name}: <b>IN STOCK! ({price})</b>\n"
-                        print(f"-> {name} IN STOCK! Alert sent.")
+                        status_report += f"✅ {name}: <b>IN STOCK! ({detected_text})</b>\n"
+                        print(f"-> {name} IN STOCK!")
                     else:
                         status_report += f"❌ {name}: Out of Stock\n"
-                        print(f"-> {name}: Out of stock.")
+                        print(f"-> {name}: Out of Stock.")
 
                 except Exception as e:
                     status_report += f"⚠️ {name}: Error\n"
@@ -142,8 +138,6 @@ def run_continuous_monitor():
 
             # Send cycle report to Telegram
             send_telegram_alert(status_report)
-
-            # Wait 60 seconds before next loop
             time.sleep(60)
 
         browser.close()
