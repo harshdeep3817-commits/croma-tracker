@@ -1,3 +1,4 @@
+
 import os
 import sys
 import time
@@ -55,7 +56,7 @@ def run_continuous_monitor():
     start_time = time.time()
     check_count = 0
 
-    send_telegram_alert(f"🚀 <b>Tracker Started!</b> Monitoring all 6 phones for pincode {PINCODE}.")
+    send_telegram_alert(f"🚀 <b>Fixed Tracker Started!</b> Monitoring all products for pincode {PINCODE}.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -80,14 +81,13 @@ def run_continuous_monitor():
                     page.goto(url, wait_until="domcontentloaded", timeout=45000)
                     page.wait_for_timeout(2500)
 
-                    # Enter pincode and click apply if visible
+                    # Enter pincode and apply if visible
                     pincode_input = page.locator("input[placeholder*='Pincode'], input[placeholder*='pincode'], #pincode")
                     if pincode_input.count() > 0 and pincode_input.first.is_visible():
                         pincode_input.first.fill(PINCODE)
                         page.keyboard.press("Enter")
                         page.wait_for_timeout(2500)
                         
-                        # Click apply button if present
                         apply_btn = page.locator("button:has-text('Apply'), span:has-text('Apply')")
                         if apply_btn.count() > 0:
                             try:
@@ -96,16 +96,20 @@ def run_continuous_monitor():
                             except Exception:
                                 pass
 
-                    page_text = page.locator("body").inner_text().lower()
-                    
-                    # Check for either 'Buy Now' or 'Add to Cart'
+                    # Look specifically at the main purchase action buttons
                     purchase_btn = page.locator("button:has-text('Buy Now'), button:has-text('Add to Cart'), button:has-text('Add To Cart')")
+                    
+                    btn_text = ""
+                    if purchase_btn.count() > 0:
+                        btn_text = purchase_btn.first.inner_text().lower()
 
+                    # Determine availability strictly from the action button state
                     is_available = (
                         purchase_btn.count() > 0
                         and purchase_btn.first.is_enabled()
-                        and "out of stock" not in page_text
-                        and "currently unavailable" not in page_text
+                        and "notify" not in btn_text
+                        and "out of stock" not in btn_text
+                        and "unavailable" not in btn_text
                     )
 
                     # Extract price dynamically
@@ -148,3 +152,4 @@ if __name__ == "__main__":
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         sys.exit(1)
     run_continuous_monitor()
+    
