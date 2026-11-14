@@ -9,8 +9,8 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 PINCODE = "125051"
 
-# Complete list of all iPhone 17 color and storage variants on Croma
-IPHONE_VARIANTS = [
+# Complete list of all products you want to track simultaneously
+PRODUCT_VARIANTS = [
     {
         "name": "Apple iPhone 17 (256GB, Black)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-black-/p/317396"
@@ -30,11 +30,15 @@ IPHONE_VARIANTS = [
     {
         "name": "Apple iPhone 17 (256GB, White)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-white-/p/324461"
+    },
+    {
+        "name": "OnePlus Nord CE6 Lite 5G (8GB RAM, 128GB, Hyper Black)",
+        "url": "https://www.croma.com/oneplus-nord-ce6-lite-5g-8gb-ram-128gb-hyper-black-/p/322994"
     }
 ]
 
 # Set to True while testing so you get a confirmation ping. Set to False later to stay silent until in stock.
-SEND_STATUS_PING = True 
+SEND_STATUS_PING = False
 
 # Run continuously for 5 hours 45 minutes before auto-restarting
 MAX_RUN_DURATION_SECONDS = 20700
@@ -56,7 +60,7 @@ def run_continuous_monitor():
     start_time = time.time()
     check_count = 0
 
-    send_telegram_alert(f"🚀 <b>60-Second Multi-Color Tracker Started!</b>\nTracking all 5 iPhone 17 colors for pincode {PINCODE}.")
+    send_telegram_alert(f"🚀 <b>60-Second Multi-Product Tracker Started!</b>\nTracking iPhones and OnePlus Nord CE6 Lite for pincode {PINCODE}.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -74,7 +78,7 @@ def run_continuous_monitor():
             print(f"\n--- Check Cycle #{check_count} ---")
             in_stock_found = False
 
-            for variant in IPHONE_VARIANTS:
+            for variant in PRODUCT_VARIANTS:
                 name = variant["name"]
                 url = variant["url"]
 
@@ -111,7 +115,7 @@ def run_continuous_monitor():
                     if is_available:
                         in_stock_found = True
                         alert_msg = (
-                            f"🚨 <b>HURRY! iPhone 17 IN STOCK!</b>\n\n"
+                            f"🚨 <b>HURRY! ITEM IN STOCK!</b>\n\n"
                             f"📱 <b>Model:</b> {name}\n"
                             f"💰 <b>Price:</b> {price}\n"
                             f"📍 <b>Pincode:</b> {PINCODE}\n"
@@ -126,7 +130,7 @@ def run_continuous_monitor():
                     print(f"Error checking {name}: {e}")
 
             if not in_stock_found and SEND_STATUS_PING and check_count == 1:
-                send_telegram_alert(f"⏱️ Multi-color tracker active. Checking all 5 variants every minute.")
+                send_telegram_alert(f"⏱️ Multi-product tracker active. Checking all listed models every minute.")
 
             # Wait 60 seconds before the next check cycle across all links
             time.sleep(60)
