@@ -22,9 +22,11 @@ def send_telegram_alert(message):
         "parse_mode": "HTML"
     }
     try:
-        requests.post(url, json=payload, timeout=15)
+        response = requests.post(url, json=payload, timeout=15)
+        print("Telegram Response Code:", response.status_code)
+        print("Telegram Response Body:", response.text)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"Telegram error exception: {e}")
 
 def check_stock():
     with sync_playwright() as p:
