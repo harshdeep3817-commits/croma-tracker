@@ -1,16 +1,22 @@
-
-name: Croma Stock Checker
+name: 24/7 High-Speed Croma Bot
 
 on:
+  workflow_dispatch:
   schedule:
-    # Runs automatically every 5 minutes, 24/7
-    - cron: '*/5 * * * *'
-  workflow_dispatch: # Allows manual 1-click test runs
+    - cron: '0 */6 * * *' # Backup trigger every 6 hours
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: croma-high-speed-tracker
+  cancel-in-progress: false
 
 jobs:
-  check-stock:
+  monitor-croma:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 355
 
     steps:
       - name: Checkout repository
@@ -27,8 +33,14 @@ jobs:
           pip install playwright requests
           playwright install --with-deps chromium
 
-      - name: Run Croma Stock Checker
+      - name: Run Continuous 60-Second Monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python croma_tracker.py
+
+      - name: Automatically Restart Next Session
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run tracker.yml
