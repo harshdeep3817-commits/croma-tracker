@@ -1,4 +1,3 @@
-
 import os
 import sys
 import time
@@ -32,7 +31,7 @@ PRODUCT_VARIANTS = [
         "url": "https://www.croma.com/apple-iphone-17-256gb-white-/p/324461"
     },
     {
-        "name": "OnePlus Nord CE6 Lite",
+        "name": "OnePlus Nord CE6 Lite 5G",
         "url": "https://www.croma.com/oneplus-nord-ce6-lite-5g-8gb-ram-128gb-hyper-black-/p/322994"
     }
 ]
@@ -45,7 +44,7 @@ def send_telegram_alert(message):
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "HTML",
-        "disable_web_page_preview": True
+        "disable_web_page_preview": False
     }
     try:
         requests.post(url, json=payload, timeout=15)
@@ -56,7 +55,7 @@ def run_continuous_monitor():
     start_time = time.time()
     check_count = 0
 
-    send_telegram_alert(f"🚀 <b>Live Tracker Started!</b> Checking all 6 phones every minute for pincode {PINCODE}.")
+    send_telegram_alert(f"🚀 <b>Tracker Started!</b> Monitoring all 6 phones for pincode {PINCODE}.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -71,36 +70,46 @@ def run_continuous_monitor():
 
         while (time.time() - start_time) < MAX_RUN_DURATION_SECONDS:
             check_count += 1
-            status_report = f"🔍 <b>Check Cycle #{check_count}</b> (Pincode: {PINCODE})\n"
-            any_in_stock = False
+            status_report = f"🔍 <b>Check Cycle #{check_count}</b>\n"
 
             for variant in PRODUCT_VARIANTS:
                 name = variant["name"]
                 url = variant["url"]
 
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                    page.wait_for_timeout(1000)
+                    page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                    page.wait_for_timeout(2500)
 
-                    # Set pincode if prompt appears
+                    # Enter pincode and click apply if visible
                     pincode_input = page.locator("input[placeholder*='Pincode'], input[placeholder*='pincode'], #pincode")
                     if pincode_input.count() > 0 and pincode_input.first.is_visible():
                         pincode_input.first.fill(PINCODE)
                         page.keyboard.press("Enter")
-                        page.wait_for_timeout(2000)
+                        page.wait_for_timeout(2500)
+                        
+                        # Click apply button if present
+                        apply_btn = page.locator("button:has-text('Apply'), span:has-text('Apply')")
+                        if apply_btn.count() > 0:
+                            try:
+                                apply_btn.first.click(timeout=2000)
+                                page.wait_for_timeout(2000)
+                            except Exception:
+                                pass
 
                     page_text = page.locator("body").inner_text().lower()
-                    buy_now_btn = page.locator("button:has-text('Buy Now')")
+                    
+                    # Check for either 'Buy Now' or 'Add to Cart'
+                    purchase_btn = page.locator("button:has-text('Buy Now'), button:has-text('Add to Cart'), button:has-text('Add To Cart')")
 
                     is_available = (
-                        buy_now_btn.count() > 0
-                        and buy_now_btn.first.is_enabled()
+                        purchase_btn.count() > 0
+                        and purchase_btn.first.is_enabled()
                         and "out of stock" not in page_text
                         and "currently unavailable" not in page_text
                     )
 
                     # Extract price dynamically
-                    price = ""
+                    price = "Check website"
                     try:
                         price_locator = page.locator(".amount, span:has-text('₹')").first
                         if price_locator.count() > 0:
@@ -109,7 +118,6 @@ def run_continuous_monitor():
                         pass
 
                     if is_available:
-                        any_in_stock = True
                         alert_msg = (
                             f"🚨 <b>HURRY! ITEM IN STOCK!</b>\n\n"
                             f"📱 <b>Model:</b> {name}\n"
@@ -119,17 +127,20 @@ def run_continuous_monitor():
                         )
                         send_telegram_alert(alert_msg)
                         status_report += f"✅ {name}: <b>IN STOCK! ({price})</b>\n"
+                        print(f"-> {name} IN STOCK! Alert sent.")
                     else:
                         status_report += f"❌ {name}: Out of Stock\n"
+                        print(f"-> {name}: Out of stock.")
 
                 except Exception as e:
-                    status_report += f"⚠️ {name}: Error checking\n"
+                    status_report += f"⚠️ {name}: Error\n"
+                    print(f"Error checking {name}: {e}")
 
-            # Send a summary report so you know every cycle is running
+            # Send cycle report to Telegram
             send_telegram_alert(status_report)
 
-            # Wait 30 seconds before next loop
-            time.sleep(30)
+            # Wait 60 seconds before next loop
+            time.sleep(60)
 
         browser.close()
 
