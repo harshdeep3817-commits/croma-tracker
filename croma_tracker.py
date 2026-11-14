@@ -1,3 +1,4 @@
+
 import os
 import sys
 import time
@@ -9,38 +10,33 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 PINCODE = "125051"
 
-# Complete list of all products you want to track simultaneously
 PRODUCT_VARIANTS = [
     {
-        "name": "Apple iPhone 17 (256GB, Black)",
+        "name": "iPhone 17 (Black)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-black-/p/317396"
     },
     {
-        "name": "Apple iPhone 17 (256GB, Sage)",
+        "name": "iPhone 17 (Sage)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-sage-/p/317403"
     },
     {
-        "name": "Apple iPhone 17 (256GB, Mist Blue)",
+        "name": "iPhone 17 (Mist Blue)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-mist-blue-/p/324462"
     },
     {
-        "name": "Apple iPhone 17 (256GB, Lavender)",
+        "name": "iPhone 17 (Lavender)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-lavender-/p/324465"
     },
     {
-        "name": "Apple iPhone 17 (256GB, White)",
+        "name": "iPhone 17 (White)",
         "url": "https://www.croma.com/apple-iphone-17-256gb-white-/p/324461"
     },
     {
-        "name": "OnePlus Nord CE6 Lite 5G (8GB RAM, 128GB, Hyper Black)",
+        "name": "OnePlus Nord CE6 Lite",
         "url": "https://www.croma.com/oneplus-nord-ce6-lite-5g-8gb-ram-128gb-hyper-black-/p/322994"
     }
 ]
 
-# Set to True while testing so you get a confirmation ping. Set to False later to stay silent until in stock.
-SEND_STATUS_PING = False
-
-# Run continuously for 5 hours 45 minutes before auto-restarting
 MAX_RUN_DURATION_SECONDS = 20700
 
 def send_telegram_alert(message):
@@ -49,7 +45,7 @@ def send_telegram_alert(message):
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "HTML",
-        "disable_web_page_preview": False
+        "disable_web_page_preview": True
     }
     try:
         requests.post(url, json=payload, timeout=15)
@@ -60,7 +56,7 @@ def run_continuous_monitor():
     start_time = time.time()
     check_count = 0
 
-    send_telegram_alert(f"🚀 <b>60-Second Multi-Product Tracker Started!</b>\nTracking iPhones and OnePlus Nord CE6 Lite for pincode {PINCODE}.")
+    send_telegram_alert(f"🚀 <b>Live Tracker Started!</b> Checking all 6 phones every minute for pincode {PINCODE}.")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -75,16 +71,16 @@ def run_continuous_monitor():
 
         while (time.time() - start_time) < MAX_RUN_DURATION_SECONDS:
             check_count += 1
-            print(f"\n--- Check Cycle #{check_count} ---")
-            in_stock_found = False
+            status_report = f"🔍 <b>Check Cycle #{check_count}</b> (Pincode: {PINCODE})\n"
+            any_in_stock = False
 
             for variant in PRODUCT_VARIANTS:
                 name = variant["name"]
                 url = variant["url"]
 
                 try:
-                    page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                    page.wait_for_timeout(2000)
+                    page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                    page.wait_for_timeout(1000)
 
                     # Set pincode if prompt appears
                     pincode_input = page.locator("input[placeholder*='Pincode'], input[placeholder*='pincode'], #pincode")
@@ -104,7 +100,7 @@ def run_continuous_monitor():
                     )
 
                     # Extract price dynamically
-                    price = "Check website"
+                    price = ""
                     try:
                         price_locator = page.locator(".amount, span:has-text('₹')").first
                         if price_locator.count() > 0:
@@ -113,7 +109,7 @@ def run_continuous_monitor():
                         pass
 
                     if is_available:
-                        in_stock_found = True
+                        any_in_stock = True
                         alert_msg = (
                             f"🚨 <b>HURRY! ITEM IN STOCK!</b>\n\n"
                             f"📱 <b>Model:</b> {name}\n"
@@ -122,23 +118,22 @@ def run_continuous_monitor():
                             f"🛒 <a href='{url}'>TAP HERE TO BUY NOW</a>"
                         )
                         send_telegram_alert(alert_msg)
-                        print(f"-> {name} IN STOCK! Alert sent.")
+                        status_report += f"✅ {name}: <b>IN STOCK! ({price})</b>\n"
                     else:
-                        print(f"-> {name}: Out of stock.")
+                        status_report += f"❌ {name}: Out of Stock\n"
 
                 except Exception as e:
-                    print(f"Error checking {name}: {e}")
+                    status_report += f"⚠️ {name}: Error checking\n"
 
-            if not in_stock_found and SEND_STATUS_PING and check_count == 1:
-                send_telegram_alert(f"⏱️ Multi-product tracker active. Checking all listed models every minute.")
+            # Send a summary report so you know every cycle is running
+            send_telegram_alert(status_report)
 
-            # Wait 60 seconds before the next check cycle across all links
-            time.sleep(60)
+            # Wait 30 seconds before next loop
+            time.sleep(30)
 
         browser.close()
 
 if __name__ == "__main__":
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("Error: Missing credentials.")
         sys.exit(1)
     run_continuous_monitor()
